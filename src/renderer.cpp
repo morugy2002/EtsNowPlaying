@@ -376,13 +376,13 @@ void Renderer::DrawCover(float cx, float cy, float cs) {
         }
     } else {
         Fill(D2D1::RoundedRect(D2D1::RectF(cx, cy, cx + cs, cy + cs), 24, 24), Rgb(1, 1, 1, 0.08f));
-        Text(L"♪", cx, cy, cs, cs, 110, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.35f), false,
+        Text(L"♪", cx, cy, cs, cs, 148, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.35f), false,
              DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     }
 }
 
 void Renderer::DrawClock() {
-    Text(Clock(), canvasW_ - 140, 22, 100, 28, 20, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f), false,
+    Text(Clock(), canvasW_ - 150, 18, 110, 36, 24, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f), false,
          DWRITE_TEXT_ALIGNMENT_TRAILING);
 }
 
@@ -398,14 +398,14 @@ void Renderer::DrawMedia(const MediaSnapshot& m, double t) {
     std::wstring source = app.find("spotify") != std::string::npos ? L"SPOTIFY" : ToWide(m.app);
     if (source.size() > 4 && source.compare(source.size() - 4, 4, L".exe") == 0) source.resize(source.size() - 4);
     for (auto& c : source) c = static_cast<wchar_t>(towupper(c));
-    Text(source, 40, 24, 300, 24, 15, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(accent_.r, accent_.g, accent_.b, 0.95f));
+    Text(source, 32, 22, 300, 30, 18, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(accent_.r, accent_.g, accent_.b, 0.95f));
 
-    DrawCover(40, 80, 280);
+    DrawCover(32, 72, 312);
 
     const float x0 = kBarX, w = BarWidth(canvasW_);  // the text column takes the width of the display
-    Text(ToWide(m.title), x0, 84, w, 112, 38, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
-    Text(ToWide(m.artist), x0, 202, w, 36, 24, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
-    Text(ToWide(m.album), x0, 240, w, 28, 18, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.5f));
+    Text(ToWide(m.title), x0, 84, w, 124, 46, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
+    Text(ToWide(m.artist), x0, 214, w, 40, 29, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
+    Text(ToWide(m.album), x0, 256, w, 32, 22, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.5f));
 
     if (m.duration > 1.0) {
         const TouchState ts = TouchGetState();
@@ -423,8 +423,8 @@ void Renderer::DrawMedia(const MediaSnapshot& m, double t) {
         brush_->SetColor(Rgb(1, 1, 1));
         const float knob = overBar || dragging ? 11.0f : 8.0f;
         rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x0 + w * frac, py + ph / 2), knob, knob), brush_.Get());
-        Text(Duration(pos), x0, py + 18, 100, 24, 16, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f));
-        Text(Duration(m.duration), x0 + w - 100, py + 18, 100, 24, 16, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f), false,
+        Text(Duration(pos), x0, py + 18, 120, 28, 19, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f));
+        Text(Duration(m.duration), x0 + w - 120, py + 18, 120, 28, 19, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f), false,
              DWRITE_TEXT_ALIGNMENT_TRAILING);
     }
 
@@ -478,7 +478,7 @@ void Renderer::DrawControls(const MediaSnapshot& m) {
             FillTriangle(D2D1::Point2F(c.x - 9, c.y - 9), D2D1::Point2F(c.x + 4, c.y), D2D1::Point2F(c.x - 9, c.y + 9));
         }
     }
-    Text(m.playing ? L"Playing" : L"Paused", 556, 406, 200, 28, 18, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
+    Text(m.playing ? L"Playing" : L"Paused", 556, 406, 200, 32, 22, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
 }
 
 // The mouse pointer on the screen (beta touch), so you can see where the plugin thinks you are pointing.
@@ -541,17 +541,17 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     DrawClock();
 
     // LIVE pill with a pulsing dot.
-    Fill(D2D1::RoundedRect(D2D1::RectF(40, 22, 128, 50), 14, 14), Rgb(0.86f, 0.12f, 0.14f, 0.95f));
+    Fill(D2D1::RoundedRect(D2D1::RectF(32, 20, 140, 52), 16, 16), Rgb(0.86f, 0.12f, 0.14f, 0.95f));
     float pulse = 0.55f + 0.45f * static_cast<float>(std::sin(t * 4.0));
     brush_->SetColor(Rgb(1, 1, 1, pulse));
-    rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(58, 36), 5, 5), brush_.Get());
-    Text(L"LIVE", 70, 22, 56, 28, 15, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), false, DWRITE_TEXT_ALIGNMENT_LEADING,
+    rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(50, 36), 5, 5), brush_.Get());
+    Text(L"LIVE", 62, 20, 70, 32, 18, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), false, DWRITE_TEXT_ALIGNMENT_LEADING,
          DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    Text(L"RADIO", 140, 22, 100, 28, 15, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.6f), false,
+    Text(L"RADIO", 152, 20, 120, 32, 18, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.6f), false,
          DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
     // Left: the song's cover, or the station's initials while there is none.
-    const float lx = 40, ly = 80, ls = 280;
+    const float lx = 32, ly = 72, ls = 312;
     if (cover_) {
         DrawCover(lx, ly, ls);
     } else {
@@ -569,7 +569,7 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
         Fill(D2D1::RoundedRect(D2D1::RectF(lx + 4, ly + 10, lx + ls + 4, ly + ls + 10), 24, 24), Rgb(0, 0, 0, 0.35f));
         Fill(D2D1::RoundedRect(D2D1::RectF(lx, ly, lx + ls, ly + ls), 24, 24),
              Rgb(accent_.r * 0.55f, accent_.g * 0.55f, accent_.b * 0.55f));
-        Text(initials.empty() ? L"♫" : initials, lx, ly, ls, ls, 110, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.95f), false,
+        Text(initials.empty() ? L"♫" : initials, lx, ly, ls, ls, 148, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.95f), false,
              DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     }
 
@@ -587,17 +587,17 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     textAlpha_ = fade;
     const float rise = (1.0f - fade) * 10.0f;  // text slides up a little while it fades in
     if (hasSong) {
-        Text(song, x0, 84 + rise, w, 112, 38, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
-        Text(artist, x0, 202 + rise, w, 36, 24, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
+        Text(song, x0, 84 + rise, w, 124, 46, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
+        Text(artist, x0, 214 + rise, w, 40, 29, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
     } else {
-        Text(ToWide(stationUtf8), x0, 84 + rise, w, 112, 38, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
+        Text(ToWide(stationUtf8), x0, 84 + rise, w, 124, 46, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
         const bool stationSaidNothing = !raw.empty() && titleIsStation;
         if (!stationSaidNothing && r.ageMs < 5000) {
             const int dots = static_cast<int>(t * 2.5) % 4;
-            Text(std::wstring(L"Looking for the track") + std::wstring(static_cast<size_t>(dots), L'.'), x0, 202, w, 30, 20,
+            Text(std::wstring(L"Looking for the track") + std::wstring(static_cast<size_t>(dots), L'.'), x0, 214, w, 34, 24,
                  DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
             // Indeterminate progress bar: a soft highlight sweeping over a faint track.
-            const float by = 242, bh = 4;
+            const float by = 256, bh = 4;
             Fill(D2D1::RoundedRect(D2D1::RectF(x0, by, x0 + w, by + bh), 2, 2), Rgb(1, 1, 1, 0.12f * textAlpha_));
             rt_->PushAxisAlignedClip(D2D1::RectF(x0, by, x0 + w, by + bh), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             float sweep = static_cast<float>(std::fmod(t * 0.7, 1.4)) - 0.2f;
@@ -625,7 +625,7 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     add(ToWide(r.genre));
     add(ToWide(r.country));
     if (!r.bitrate.empty()) add(ToWide(r.bitrate) + L" kbps");
-    Text(meta, x0, 408, w, 24, 16, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.42f));
+    Text(meta, x0, 404, w, 30, 19, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.42f));
     textAlpha_ = 1.0f;
 }
 
@@ -636,9 +636,9 @@ void Renderer::DrawIdle(double t) {
     accent_.g = Lerp(accent_.g, target.g, 0.12f);
     accent_.b = Lerp(accent_.b, target.b, 0.12f);
     Background(accent_);
-    Text(Clock(), 0, 120, canvasW_, 150, 120, DWRITE_FONT_WEIGHT_LIGHT, Rgb(1, 1, 1, 0.92f), false,
+    Text(Clock(), 0, 90, canvasW_, 190, 144, DWRITE_FONT_WEIGHT_LIGHT, Rgb(1, 1, 1, 0.92f), false,
          DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    Text(L"Nothing playing", 0, 290, canvasW_, 36, 22, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.45f), false,
+    Text(L"Nothing playing", 0, 300, canvasW_, 40, 26, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.45f), false,
          DWRITE_TEXT_ALIGNMENT_CENTER);
     (void)t;
 }
