@@ -156,6 +156,9 @@ private:
     void Text(const std::wstring& s, float x, float y, float w, float h, float size, DWRITE_FONT_WEIGHT weight,
               D2D1_COLOR_F color, bool wrap = false, DWRITE_TEXT_ALIGNMENT align = DWRITE_TEXT_ALIGNMENT_LEADING,
               DWRITE_PARAGRAPH_ALIGNMENT palign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    void TextOutlined(const std::wstring& s, float x, float y, float w, float h, float size, DWRITE_FONT_WEIGHT weight,
+                      D2D1_COLOR_F color, bool wrap, float radius, DWRITE_TEXT_ALIGNMENT align = DWRITE_TEXT_ALIGNMENT_LEADING,
+                      DWRITE_PARAGRAPH_ALIGNMENT palign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
     void Fill(const D2D1_ROUNDED_RECT& r, D2D1_COLOR_F c);
     float FitFont(const std::wstring& s, float width, float maxHeight, float size, DWRITE_FONT_WEIGHT weight,
                   float* needed);
@@ -259,6 +262,21 @@ void Renderer::Text(const std::wstring& s, float x, float y, float w, float h, f
     brush_->SetColor(color);
     rt_->DrawText(s.c_str(), static_cast<UINT32>(s.size()), fmt.Get(), D2D1::RectF(x, y, x + w, y + h), brush_.Get(),
                   D2D1_DRAW_TEXT_OPTIONS_CLIP);
+}
+
+// Text with a dark outline and a soft drop shadow, so it stays readable on bright and busy backgrounds. The outline is
+// the same text drawn dark around the real one (8 directions at `radius` layout units).
+void Renderer::TextOutlined(const std::wstring& s, float x, float y, float w, float h, float size, DWRITE_FONT_WEIGHT weight,
+                            D2D1_COLOR_F color, bool wrap, float radius, DWRITE_TEXT_ALIGNMENT align,
+                            DWRITE_PARAGRAPH_ALIGNMENT palign) {
+    if (s.empty()) return;
+    static const float dir[8][2] = {{1.0f, 0.0f},    {-1.0f, 0.0f},   {0.0f, 1.0f},    {0.0f, -1.0f},
+                                    {0.7071f, 0.7071f}, {-0.7071f, 0.7071f}, {0.7071f, -0.7071f}, {-0.7071f, -0.7071f}};
+    Text(s, x, y + radius * 1.8f, w, h, size, weight, Rgb(0, 0, 0, 0.35f), wrap, align, palign);  // soft shadow
+    for (const auto& d : dir) {
+        Text(s, x + d[0] * radius, y + d[1] * radius, w, h, size, weight, Rgb(0, 0, 0, 0.55f), wrap, align, palign);
+    }
+    Text(s, x, y, w, h, size, weight, color, wrap, align, palign);
 }
 
 void Renderer::Fill(const D2D1_ROUNDED_RECT& r, D2D1_COLOR_F c) {
@@ -563,7 +581,6 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     accent_.g = Lerp(accent_.g, target.g, 0.12f);
     accent_.b = Lerp(accent_.b, target.b, 0.12f);
     Background(accent_);
-    DrawClock();
 
     // Layout in the style of TruckNowPlaying: a big rounded cover on the left, the text block centred next to it
     // (station small in the accent colour on top, song big, artist below) and a LIVE row with a little equalizer at
@@ -573,6 +590,20 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     const float cs = std::min(designH - 2 * m, (canvasW_ - 3 * m) * 0.60f);
     const float lx = m, ly = (designH - cs) / 2;
     const float x0 = lx + cs + m, w = canvasW_ - x0 - m;
+
+    // Readability: a dark veil that fades in behind the text column (bright covers give a bright blurred background).
+    {
+        D2D1_GRADIENT_STOP veil[2] = {{0.0f, Rgb(0, 0, 0, 0.0f)}, {1.0f, Rgb(0, 0, 0, 0.5f)}};
+        ComPtr<ID2D1GradientStopCollection> vc;
+        ComPtr<ID2D1LinearGradientBrush> vb;
+        if (SUCCEEDED(rt_->CreateGradientStopCollection(veil, 2, vc.GetAddressOf())) &&
+            SUCCEEDED(rt_->CreateLinearGradientBrush(
+                D2D1::LinearGradientBrushProperties(D2D1::Point2F(x0 - m * 1.5f, 0), D2D1::Point2F(x0 + 30.0f, 0)), vc.Get(),
+                vb.GetAddressOf()))) {
+            rt_->FillRectangle(D2D1::RectF(x0 - m * 1.5f, -2000.0f, canvasW_ + 2000.0f, designH + 2000.0f), vb.Get());
+        }
+    }
+    DrawClock();
 
     // Left: the song's cover (or the station's logo), or the station's initials while there is none.
     if (cover_) {
@@ -622,13 +653,15 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     float y = ly + std::max(0.0f, (cs - statusH - total) / 2) + rise;
 
     if (hasSong) {
-        Text(stationW, x0, y, w, labelH, 21, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(accent_.r, accent_.g, accent_.b, 0.95f));
+        // the accent colour a little lighter, so it also stands out against a dark veil
+        TextOutlined(stationW, x0, y, w, labelH, 21, DWRITE_FONT_WEIGHT_SEMI_BOLD,
+                     Rgb(Lerp(accent_.r, 1.0f, 0.25f), Lerp(accent_.g, 1.0f, 0.25f), Lerp(accent_.b, 1.0f, 0.25f)), false, 1.4f);
         y += labelH;
     }
-    Text(titleText, x0, y, w, titleH + 8, titleSize, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
+    TextOutlined(titleText, x0, y, w, titleH + 8, titleSize, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true, 2.0f);
     y += titleH;
     if (hasSong) {
-        Text(artist, x0, y + 12, w, artistH + 8, artistSize, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f), true);
+        TextOutlined(artist, x0, y + 12, w, artistH + 8, artistSize, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.94f), true, 1.6f);
     } else if (searching) {
         const int dots = static_cast<int>(t * 2.5) % 4;
         Text(std::wstring(L"Looking for the track") + std::wstring(static_cast<size_t>(dots), L'.'), x0, y + 12, w, 34, 24,
@@ -649,8 +682,8 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     const float pulse = 0.55f + 0.45f * static_cast<float>(std::sin(t * 4.0));
     brush_->SetColor(Rgb(0.95f, 0.2f, 0.2f, pulse));
     rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x0 + 8, sy + 14), 7, 7), brush_.Get());
-    Text(L"LIVE", x0 + 24, sy, 70, 28, 20, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.75f), false,
-         DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    TextOutlined(L"LIVE", x0 + 24, sy, 70, 28, 20, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.92f), false, 1.4f,
+                 DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     for (int i = 0; i < 6; ++i) {
         float h = 6.0f + 20.0f * static_cast<float>(0.5 + 0.5 * std::sin(t * (3.0 + i * 0.7) + i * 1.3));
         float x = x0 + 104.0f + i * 14.0f;
