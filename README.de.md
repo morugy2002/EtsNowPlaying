@@ -6,8 +6,11 @@ direkt in der Kabine auf Zurück / Pause / Weiter klicken.
 
 *[English](README.md) · Deutsch*
 
+> **Hinweis zum Fork:** Dieser Fork gibt dem Radio-Display ein neues Aussehen – größeres Cover, größerer und besser lesbarer Text.
+> Siehe [Was in diesem Fork anders ist](#was-in-diesem-fork-anders-ist). Alles andere ist unverändert vom Original.
+
 <p align="center">
-  <img src="docs/images/radio.png" alt="Spielradio mit Song-Cover" width="48%">
+  <img src="docs/images/radio-fork-1.jpg" alt="Spielradio mit Song-Cover (dieser Fork)" width="48%">
   <img src="docs/images/spotify.png" alt="Spotify mit Tasten" width="48%">
 </p>
 
@@ -21,6 +24,32 @@ direkt in der Kabine auf Zurück / Pause / Weiter klicken.
   klicken oder ihn ziehen, um im Song vor- und zurückzuspulen.
 - **Passt in jede Kabine:** Das Bild passt sich selbst an die Form des Displays jedes Fahrzeugs an – nichts pro Truck einstellen.
 - **Eine Datei.** Nichts weiter zu installieren. Funktioniert mit TruckersMP.
+
+## Was in diesem Fork anders ist
+
+Dies ist ein Fork von [jxhnch/EtsNowPlaying](https://github.com/jxhnch/EtsNowPlaying) (MIT). **Geändert wurde nur das Aussehen
+des Radio-Displays** (`src/renderer.cpp`). Radioerkennung, Cover, Spotify, die Touch-Tasten und alle Einstellungen sind
+unverändert vom Original, und die Änderungen stehen unter derselben MIT-Lizenz.
+
+<p align="center">
+  <img src="docs/images/radio.png" alt="Radio-Display des Original-Plugins" width="48%">
+  <img src="docs/images/radio-fork-2.jpg" alt="Radio-Display dieses Forks" width="48%">
+</p>
+<p align="center"><em>Original (links) · dieser Fork (rechts)</em></p>
+
+- **Größeres Cover, größerer Text:** Das Cover füllt fast die ganze Höhe des Displays. Daneben, vertikal zentriert: der
+  Sendername (klein, in der Akzentfarbe des Covers), der Song (groß) und der Interpret.
+- **Der Text passt:** Lange Titel und Interpreten werden umgebrochen (bis zu 3 bzw. 2 Zeilen) und auf etwa 70 % verkleinert,
+  bevor sie abgeschnitten werden.
+- **Auch auf hellen Covern lesbar:** Der Text hat einen dunklen Rand und einen weichen Schatten, und hinter der Textspalte
+  blendet ein dunkler Schleier ein. Cover und unscharfer Hintergrund links bleiben hell und farbig.
+- **Untere Zeile:** ein pulsierender roter Punkt, `LIVE` und ein kleiner Equalizer. Sie ersetzt die rote `LIVE`-Anzeige samt `RADIO`-Beschriftung
+  oben und die Zeile mit Genre / Land / Bitrate.
+- Das Spotify-Display ist unverändert.
+
+**DLL dieses Forks holen:** Jeder Push wird von GitHub Actions gebaut ([`build.yml`](.github/workflows/build.yml)). Öffne den
+neuesten Lauf im Reiter **Actions** und lade das Artefakt **`EtsNowPlaying-DLL`** herunter (ein Zip mit `EtsNowPlaying.dll`),
+dann wie unten beschrieben installieren.
 
 ## Installieren
 
