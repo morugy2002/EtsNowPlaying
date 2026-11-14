@@ -6,8 +6,11 @@ previous / pause / next right in the cabin.
 
 *English · [Deutsch](README.de.md)*
 
+> **Fork note:** this fork gives the radio screen a new look – bigger cover, larger and more readable text.
+> See [What is different in this fork](#what-is-different-in-this-fork). Everything else is unchanged from the original.
+
 <p align="center">
-  <img src="docs/images/radio.png" alt="In-game radio with song cover" width="48%">
+  <img src="docs/images/radio-fork-1.jpg" alt="In-game radio with song cover (this fork)" width="48%">
   <img src="docs/images/spotify.png" alt="Spotify with controls" width="48%">
 </p>
 
@@ -21,6 +24,31 @@ previous / pause / next right in the cabin.
   jump around in the song.
 - **Fits every cabin:** the picture adapts to the shape of each vehicle's display by itself – no setup per truck.
 - **One file.** Nothing else to install. Works with TruckersMP.
+
+## What is different in this fork
+
+This is a fork of [jxhnch/EtsNowPlaying](https://github.com/jxhnch/EtsNowPlaying) (MIT). **Only the look of the radio screen
+was changed** (`src/renderer.cpp`). Radio detection, covers, Spotify, the touch buttons and all settings come unchanged from the
+original, and the changes are released under the same MIT License.
+
+<p align="center">
+  <img src="docs/images/radio.png" alt="Radio screen of the original plugin" width="48%">
+  <img src="docs/images/radio-fork-2.jpg" alt="Radio screen of this fork" width="48%">
+</p>
+<p align="center"><em>Original (left) · this fork (right)</em></p>
+
+- **Bigger cover, larger text:** the cover fills almost the whole display height. Next to it, vertically centred: the station
+  name (small, in the cover's accent colour), the song (large) and the artist.
+- **Text fits:** long titles and artists wrap (up to 3 and 2 lines) and shrink down to about 70 % before they are cut off.
+- **Readable on bright covers:** the text has a dark outline and a soft shadow, and a dark veil fades in behind the text
+  column. The cover and the blurred background on the left stay bright and colourful.
+- **Bottom row:** a pulsing red dot, `LIVE` and a small equalizer. It replaces the red `LIVE` pill with the `RADIO`
+  label at the top and the genre / country / bitrate line.
+- The Spotify screen is unchanged.
+
+**Get the DLL of this fork:** every push is built by GitHub Actions ([`build.yml`](.github/workflows/build.yml)). Open the latest
+run in the **Actions** tab and download the artifact **`EtsNowPlaying-DLL`** (a zip with `EtsNowPlaying.dll`), then install it as
+described below.
 
 ## Install
 
