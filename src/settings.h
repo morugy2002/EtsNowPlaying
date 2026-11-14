@@ -13,6 +13,8 @@ struct Settings {
     bool touch = true;              // [touch] enabled: click the buttons on the screen with the mouse
     int autoFit = 1;                // [screen] auto_fit: 0 off, 1 fit the picture to each truck's display, 2 measure only
     bool extraSources = true;       // [radio] extra_sources: use the optional EtsNowPlaying.sources.ini
+    std::string coverCountry = "auto";  // [radio] cover_country: iTunes store for cover lookups. "auto" = the station's country
+                                        // from live_streams.sii, "none" = default store only, or a code like "TR"
     bool textureFinder = false;     // [debug] texture_finder: developer tool (Ctrl+Shift+F6..F9), not in the default ini
 };
 

@@ -156,7 +156,12 @@ private:
     void Text(const std::wstring& s, float x, float y, float w, float h, float size, DWRITE_FONT_WEIGHT weight,
               D2D1_COLOR_F color, bool wrap = false, DWRITE_TEXT_ALIGNMENT align = DWRITE_TEXT_ALIGNMENT_LEADING,
               DWRITE_PARAGRAPH_ALIGNMENT palign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    void TextOutlined(const std::wstring& s, float x, float y, float w, float h, float size, DWRITE_FONT_WEIGHT weight,
+                      D2D1_COLOR_F color, bool wrap, float radius, DWRITE_TEXT_ALIGNMENT align = DWRITE_TEXT_ALIGNMENT_LEADING,
+                      DWRITE_PARAGRAPH_ALIGNMENT palign = DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
     void Fill(const D2D1_ROUNDED_RECT& r, D2D1_COLOR_F c);
+    float FitFont(const std::wstring& s, float width, float maxHeight, float size, DWRITE_FONT_WEIGHT weight,
+                  float* needed);
     void Background(D2D1_COLOR_F accent);
     void BackgroundFill(D2D1_COLOR_F accent);
     void SetCover(const CoverBytes& bytes, uint64_t key, bool isLogo = false);
@@ -259,9 +264,47 @@ void Renderer::Text(const std::wstring& s, float x, float y, float w, float h, f
                   D2D1_DRAW_TEXT_OPTIONS_CLIP);
 }
 
+// Text with a dark outline and a soft drop shadow, so it stays readable on bright and busy backgrounds. The outline is
+// the same text drawn dark around the real one (8 directions at `radius` layout units).
+void Renderer::TextOutlined(const std::wstring& s, float x, float y, float w, float h, float size, DWRITE_FONT_WEIGHT weight,
+                            D2D1_COLOR_F color, bool wrap, float radius, DWRITE_TEXT_ALIGNMENT align,
+                            DWRITE_PARAGRAPH_ALIGNMENT palign) {
+    if (s.empty()) return;
+    static const float dir[8][2] = {{1.0f, 0.0f},    {-1.0f, 0.0f},   {0.0f, 1.0f},    {0.0f, -1.0f},
+                                    {0.7071f, 0.7071f}, {-0.7071f, 0.7071f}, {0.7071f, -0.7071f}, {-0.7071f, -0.7071f}};
+    Text(s, x, y + radius * 1.8f, w, h, size, weight, Rgb(0, 0, 0, 0.35f), wrap, align, palign);  // soft shadow
+    for (const auto& d : dir) {
+        Text(s, x + d[0] * radius, y + d[1] * radius, w, h, size, weight, Rgb(0, 0, 0, 0.55f), wrap, align, palign);
+    }
+    Text(s, x, y, w, h, size, weight, color, wrap, align, palign);
+}
+
 void Renderer::Fill(const D2D1_ROUNDED_RECT& r, D2D1_COLOR_F c) {
     brush_->SetColor(c);
     rt_->FillRoundedRectangle(r, brush_.Get());
+}
+
+// Largest of size / 85% / 72% at which `s` wraps into `width` and fits `maxHeight`. `needed` gets the height the text
+// really takes at that size (never more than maxHeight).
+float Renderer::FitFont(const std::wstring& s, float width, float maxHeight, float size, DWRITE_FONT_WEIGHT weight,
+                        float* needed) {
+    if (needed) *needed = 0.0f;
+    if (s.empty()) return size;
+    float chosen = size, h = 0.0f;
+    const float scales[3] = {1.0f, 0.85f, 0.72f};
+    for (float scale : scales) {
+        chosen = size * scale;
+        auto fmt = Format(chosen, weight, true);
+        ComPtr<IDWriteTextLayout> layout;
+        if (!fmt || FAILED(dw_->CreateTextLayout(s.c_str(), static_cast<UINT32>(s.size()), fmt.Get(), width, 10000.0f,
+                                                 layout.GetAddressOf()))) continue;
+        DWRITE_TEXT_METRICS tm{};
+        if (FAILED(layout->GetMetrics(&tm))) continue;
+        h = tm.height;
+        if (h <= maxHeight) break;
+    }
+    if (needed) *needed = std::min(h, maxHeight);
+    return chosen;
 }
 
 void Renderer::Background(D2D1_COLOR_F accent) {
@@ -376,13 +419,13 @@ void Renderer::DrawCover(float cx, float cy, float cs) {
         }
     } else {
         Fill(D2D1::RoundedRect(D2D1::RectF(cx, cy, cx + cs, cy + cs), 24, 24), Rgb(1, 1, 1, 0.08f));
-        Text(L"♪", cx, cy, cs, cs, 110, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.35f), false,
+        Text(L"♪", cx, cy, cs, cs, cs * 0.47f, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.35f), false,
              DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     }
 }
 
 void Renderer::DrawClock() {
-    Text(Clock(), canvasW_ - 140, 22, 100, 28, 20, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f), false,
+    Text(Clock(), canvasW_ - 150, 18, 110, 36, 24, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f), false,
          DWRITE_TEXT_ALIGNMENT_TRAILING);
 }
 
@@ -395,23 +438,23 @@ void Renderer::DrawMedia(const MediaSnapshot& m, double t) {
     DrawClock();
 
     std::string app = Lower(m.app);
-    std::wstring source;
+        std::wstring source;
     if (app.find("spotify") != std::string::npos) source = L"SPOTIFY";
     else if (app.find("applemusic") != std::string::npos) source = L"Apple Music";
     else if (app.find("deezer") != std::string::npos) source = L"Deezer";
     else if (app.find("tidal") != std::string::npos) source = L"Tidal";
-    else if (app.find("amazonmusic") != std::string::npos) source = L"Amazon Music";
+    else if (app.find("amazon") != std::string::npos) source = L"Amazon Music";
     else source = ToWide(m.app);
     if (source.size() > 4 && source.compare(source.size() - 4, 4, L".exe") == 0) source.resize(source.size() - 4);
     for (auto& c : source) c = static_cast<wchar_t>(towupper(c));
-    Text(source, 40, 24, 300, 24, 15, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(accent_.r, accent_.g, accent_.b, 0.95f));
+    Text(source, 32, 22, 300, 30, 18, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(accent_.r, accent_.g, accent_.b, 0.95f));
 
-    DrawCover(40, 80, 280);
+    DrawCover(32, 72, 312);
 
     const float x0 = kBarX, w = BarWidth(canvasW_);  // the text column takes the width of the display
-    Text(ToWide(m.title), x0, 84, w, 112, 38, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
-    Text(ToWide(m.artist), x0, 202, w, 36, 24, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
-    Text(ToWide(m.album), x0, 240, w, 28, 18, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.5f));
+    Text(ToWide(m.title), x0, 84, w, 124, 46, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
+    Text(ToWide(m.artist), x0, 214, w, 40, 29, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
+    Text(ToWide(m.album), x0, 256, w, 32, 22, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.5f));
 
     if (m.duration > 1.0) {
         const TouchState ts = TouchGetState();
@@ -429,8 +472,8 @@ void Renderer::DrawMedia(const MediaSnapshot& m, double t) {
         brush_->SetColor(Rgb(1, 1, 1));
         const float knob = overBar || dragging ? 11.0f : 8.0f;
         rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x0 + w * frac, py + ph / 2), knob, knob), brush_.Get());
-        Text(Duration(pos), x0, py + 18, 100, 24, 16, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f));
-        Text(Duration(m.duration), x0 + w - 100, py + 18, 100, 24, 16, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f), false,
+        Text(Duration(pos), x0, py + 18, 120, 28, 19, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f));
+        Text(Duration(m.duration), x0 + w - 120, py + 18, 120, 28, 19, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.6f), false,
              DWRITE_TEXT_ALIGNMENT_TRAILING);
     }
 
@@ -484,7 +527,7 @@ void Renderer::DrawControls(const MediaSnapshot& m) {
             FillTriangle(D2D1::Point2F(c.x - 9, c.y - 9), D2D1::Point2F(c.x + 4, c.y), D2D1::Point2F(c.x - 9, c.y + 9));
         }
     }
-    Text(m.playing ? L"Playing" : L"Paused", 556, 406, 200, 28, 18, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
+    Text(m.playing ? L"Playing" : L"Paused", 556, 406, 200, 32, 22, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
 }
 
 // The mouse pointer on the screen (beta touch), so you can see where the plugin thinks you are pointing.
@@ -516,7 +559,7 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     if (hasSong && !artist.empty() && GetSettings().coverLookup) {
         if (raw != lastCoverRequest_) {
             lastCoverRequest_ = raw;
-            CoverLookupRequest(raw);
+            CoverLookupRequest(raw, r.country);
         }
         CoverResult c = CoverLookupGet(raw);
         if (c.state == CoverState::Found) {
@@ -544,22 +587,33 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     accent_.g = Lerp(accent_.g, target.g, 0.12f);
     accent_.b = Lerp(accent_.b, target.b, 0.12f);
     Background(accent_);
+
+    // Layout in the style of TruckNowPlaying: a big rounded cover on the left, the text block centred next to it
+    // (station small in the accent colour on top, song big, artist below) and a LIVE row with a little equalizer at
+    // the bottom. The design area is 800x480 high; a wider display gets a wider text column.
+    const float designH = static_cast<float>(kCanvasHeight);
+    const float m = 0.07f * std::min(canvasW_, designH);
+    const float cs = std::min(designH - 2 * m, (canvasW_ - 3 * m) * 0.55f);
+    const float lx = m, ly = (designH - cs) / 2;
+    const float x0 = lx + cs + m, w = canvasW_ - x0 - m;
+
+    // Readability: a dark veil that fades in behind the text column (bright covers give a bright blurred background).
+    {
+        D2D1_GRADIENT_STOP veil[2] = {{0.0f, Rgb(0, 0, 0, 0.0f)}, {1.0f, Rgb(0, 0, 0, 0.6f)}};
+        ComPtr<ID2D1GradientStopCollection> vc;
+        ComPtr<ID2D1LinearGradientBrush> vb;
+        if (SUCCEEDED(rt_->CreateGradientStopCollection(veil, 2, vc.GetAddressOf())) &&
+            SUCCEEDED(rt_->CreateLinearGradientBrush(
+                D2D1::LinearGradientBrushProperties(D2D1::Point2F(x0 - m * 2.0f, 0), D2D1::Point2F(x0 + 30.0f, 0)), vc.Get(),
+                vb.GetAddressOf()))) {
+            rt_->FillRectangle(D2D1::RectF(x0 - m * 2.0f, -2000.0f, canvasW_ + 2000.0f, designH + 2000.0f), vb.Get());
+        }
+    }
     DrawClock();
 
-    // LIVE pill with a pulsing dot.
-    Fill(D2D1::RoundedRect(D2D1::RectF(40, 22, 128, 50), 14, 14), Rgb(0.86f, 0.12f, 0.14f, 0.95f));
-    float pulse = 0.55f + 0.45f * static_cast<float>(std::sin(t * 4.0));
-    brush_->SetColor(Rgb(1, 1, 1, pulse));
-    rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(58, 36), 5, 5), brush_.Get());
-    Text(L"LIVE", 70, 22, 56, 28, 15, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), false, DWRITE_TEXT_ALIGNMENT_LEADING,
-         DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    Text(L"RADIO", 140, 22, 100, 28, 15, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.6f), false,
-         DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-    // Left: the song's cover, or the station's initials while there is none.
-    const float lx = 40, ly = 80, ls = 280;
+    // Left: the song's cover (or the station's logo), or the station's initials while there is none.
     if (cover_) {
-        DrawCover(lx, ly, ls);
+        DrawCover(lx, ly, cs);
     } else {
         std::wstring name = ToWide(stationUtf8);
         std::wstring initials;
@@ -572,18 +626,16 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
                 startWord = true;
             }
         }
-        Fill(D2D1::RoundedRect(D2D1::RectF(lx + 4, ly + 10, lx + ls + 4, ly + ls + 10), 24, 24), Rgb(0, 0, 0, 0.35f));
-        Fill(D2D1::RoundedRect(D2D1::RectF(lx, ly, lx + ls, ly + ls), 24, 24),
+        Fill(D2D1::RoundedRect(D2D1::RectF(lx + 4, ly + 10, lx + cs + 4, ly + cs + 10), 24, 24), Rgb(0, 0, 0, 0.35f));
+        Fill(D2D1::RoundedRect(D2D1::RectF(lx, ly, lx + cs, ly + cs), 24, 24),
              Rgb(accent_.r * 0.55f, accent_.g * 0.55f, accent_.b * 0.55f));
-        Text(initials.empty() ? L"♫" : initials, lx, ly, ls, ls, 110, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.95f), false,
-             DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        Text(initials.empty() ? L"♫" : initials, lx, ly, cs, cs, cs * 0.47f, DWRITE_FONT_WEIGHT_SEMI_BOLD,
+             Rgb(1, 1, 1, 0.95f), false, DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
     }
 
-    // Right: song and artist big. While the stream has not told us the song yet (many stations only send it
-    // after a few seconds), the station name stands in, with a moving "looking for the track" bar below it for
-    // the first 5 seconds. After that (or when the station only sends its own name) just the station name stays.
-    // New text fades in when it changes.
-    const float x0 = 360, w = canvasW_ - x0 - 40;  // the text column takes the width of the display
+    // Right: song and artist. While the stream has not told us the song yet (many stations only send it after a few
+    // seconds), the station name stands in, with a moving "looking for the track" bar below it for the first 5
+    // seconds. New text fades in when it changes.
     const std::string key = hasSong ? raw : "station:" + stationUtf8;
     if (key != titleKey_) {
         titleKey_ = key;
@@ -592,47 +644,73 @@ void Renderer::DrawRadio(const RadioSnapshot& r, double t) {
     const float fade = Ease(static_cast<float>((t - titleChangedAt_) / 0.45));
     textAlpha_ = fade;
     const float rise = (1.0f - fade) * 10.0f;  // text slides up a little while it fades in
+
+    const std::wstring stationW = ToWide(stationUtf8);
+    const std::wstring titleText = hasSong ? song : stationW;
+    const bool stationSaidNothing = !raw.empty() && titleIsStation;
+    const bool searching = !hasSong && !stationSaidNothing && r.ageMs < 5000;
+    float titleH = 0.0f, artistH = 0.0f;
+    const float titleSize = FitFont(titleText, w, 200.0f, 48.0f, DWRITE_FONT_WEIGHT_SEMI_BOLD, &titleH);
+    const float artistSize = hasSong ? FitFont(artist, w, 92.0f, 33.0f, DWRITE_FONT_WEIGHT_SEMI_BOLD, &artistH) : 0.0f;
+    const float labelH = hasSong ? 38.0f : 0.0f;
+    const float subH = hasSong ? artistH : (searching ? 40.0f : 0.0f);
+    const float total = labelH + titleH + (subH > 0.0f ? 12.0f + subH : 0.0f);
+    const float statusH = 40.0f;  // the LIVE row at the bottom of the cover
+    float y = ly + std::max(0.0f, (cs - statusH - total) / 2) + rise;
+
     if (hasSong) {
-        Text(song, x0, 84 + rise, w, 112, 38, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
-        Text(artist, x0, 202 + rise, w, 36, 24, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.82f));
-    } else {
-        Text(ToWide(stationUtf8), x0, 84 + rise, w, 112, 38, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true);
-        const bool stationSaidNothing = !raw.empty() && titleIsStation;
-        if (!stationSaidNothing && r.ageMs < 5000) {
-            const int dots = static_cast<int>(t * 2.5) % 4;
-            Text(std::wstring(L"Looking for the track") + std::wstring(static_cast<size_t>(dots), L'.'), x0, 202, w, 30, 20,
-                 DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
-            // Indeterminate progress bar: a soft highlight sweeping over a faint track.
-            const float by = 242, bh = 4;
-            Fill(D2D1::RoundedRect(D2D1::RectF(x0, by, x0 + w, by + bh), 2, 2), Rgb(1, 1, 1, 0.12f * textAlpha_));
-            rt_->PushAxisAlignedClip(D2D1::RectF(x0, by, x0 + w, by + bh), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-            float sweep = static_cast<float>(std::fmod(t * 0.7, 1.4)) - 0.2f;
-            Fill(D2D1::RoundedRect(D2D1::RectF(x0 + sweep * w, by, x0 + sweep * w + 120, by + bh), 2, 2),
-                 Rgb(accent_.r, accent_.g, accent_.b, 0.85f * textAlpha_));
-            rt_->PopAxisAlignedClip();
+        // A small dark pill behind the station name keeps it readable on any background; the text is the accent colour
+        // mostly turned to white.
+        float labelW = 0.0f;
+        auto labelFmt = Format(25.0f, DWRITE_FONT_WEIGHT_SEMI_BOLD, false);
+        ComPtr<IDWriteTextLayout> labelLayout;
+        DWRITE_TEXT_METRICS lm{};
+        if (labelFmt && !stationW.empty() &&
+            SUCCEEDED(dw_->CreateTextLayout(stationW.c_str(), static_cast<UINT32>(stationW.size()), labelFmt.Get(), w, 100.0f,
+                                            labelLayout.GetAddressOf())) &&
+            SUCCEEDED(labelLayout->GetMetrics(&lm))) {
+            labelW = std::min(lm.widthIncludingTrailingWhitespace, w - 20.0f);
         }
+        if (labelW > 0.0f) {
+            Fill(D2D1::RoundedRect(D2D1::RectF(x0 - 10.0f, y + 1.0f, x0 + labelW + 10.0f, y + labelH - 3.0f), 9, 9),
+                 Rgb(0, 0, 0, 0.36f * textAlpha_));
+        }
+        TextOutlined(stationW, x0, y, w, labelH, 25, DWRITE_FONT_WEIGHT_SEMI_BOLD,
+                     Rgb(Lerp(accent_.r, 1.0f, 0.6f), Lerp(accent_.g, 1.0f, 0.6f), Lerp(accent_.b, 1.0f, 0.6f)), false, 1.8f);
+        y += labelH;
     }
-
-    // Equalizer.
-    for (int i = 0; i < 9; ++i) {
-        float h = 8.0f + 26.0f * static_cast<float>(0.5 + 0.5 * std::sin(t * (3.0 + i * 0.7) + i * 1.3));
-        float x = x0 + i * 22.0f;
-        Fill(D2D1::RoundedRect(D2D1::RectF(x, 372 - h, x + 12, 372), 3, 3), Rgb(accent_.r, accent_.g, accent_.b, 0.9f));
+    TextOutlined(titleText, x0, y, w, titleH + 8, titleSize, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1), true, 2.2f);
+    y += titleH;
+    if (hasSong) {
+        TextOutlined(artist, x0, y + 12, w, artistH + 8, artistSize, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.96f), true, 2.0f);
+    } else if (searching) {
+        const int dots = static_cast<int>(t * 2.5) % 4;
+        Text(std::wstring(L"Looking for the track") + std::wstring(static_cast<size_t>(dots), L'.'), x0, y + 12, w, 34, 24,
+             DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.55f));
+        // Indeterminate progress bar: a soft highlight sweeping over a faint track.
+        const float by = y + 50, bh = 4;
+        Fill(D2D1::RoundedRect(D2D1::RectF(x0, by, x0 + w, by + bh), 2, 2), Rgb(1, 1, 1, 0.12f * textAlpha_));
+        rt_->PushAxisAlignedClip(D2D1::RectF(x0, by, x0 + w, by + bh), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        float sweep = static_cast<float>(std::fmod(t * 0.7, 1.4)) - 0.2f;
+        Fill(D2D1::RoundedRect(D2D1::RectF(x0 + sweep * w, by, x0 + sweep * w + 120, by + bh), 2, 2),
+             Rgb(accent_.r, accent_.g, accent_.b, 0.85f * textAlpha_));
+        rt_->PopAxisAlignedClip();
     }
-
-    // The station is the least important part: one small line at the bottom.
-    std::wstring meta;
-    if (hasSong) meta = ToWide(stationUtf8);
-    auto add = [&](const std::wstring& part) {
-        if (part.empty()) return;
-        if (!meta.empty()) meta += L"  ·  ";
-        meta += part;
-    };
-    add(ToWide(r.genre));
-    add(ToWide(r.country));
-    if (!r.bitrate.empty()) add(ToWide(r.bitrate) + L" kbps");
-    Text(meta, x0, 408, w, 24, 16, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.42f));
     textAlpha_ = 1.0f;
+
+    // Bottom row, level with the lower edge of the cover: pulsing red dot, LIVE, and a small equalizer.
+    const float sy = ly + cs - 30.0f;
+    const float pulse = 0.55f + 0.45f * static_cast<float>(std::sin(t * 4.0));
+    brush_->SetColor(Rgb(0.95f, 0.2f, 0.2f, pulse));
+    rt_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x0 + 8, sy + 14), 7, 7), brush_.Get());
+    TextOutlined(L"LIVE", x0 + 24, sy, 76, 28, 23, DWRITE_FONT_WEIGHT_SEMI_BOLD, Rgb(1, 1, 1, 0.95f), false, 1.7f,
+                 DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+    for (int i = 0; i < 6; ++i) {
+        float h = 6.0f + 20.0f * static_cast<float>(0.5 + 0.5 * std::sin(t * (3.0 + i * 0.7) + i * 1.3));
+        float x = x0 + 112.0f + i * 14.0f;
+        Fill(D2D1::RoundedRect(D2D1::RectF(x, sy + 27 - h, x + 8, sy + 27), 2, 2),
+             Rgb(accent_.r, accent_.g, accent_.b, 0.9f));
+    }
 }
 
 void Renderer::DrawIdle(double t) {
@@ -642,9 +720,9 @@ void Renderer::DrawIdle(double t) {
     accent_.g = Lerp(accent_.g, target.g, 0.12f);
     accent_.b = Lerp(accent_.b, target.b, 0.12f);
     Background(accent_);
-    Text(Clock(), 0, 120, canvasW_, 150, 120, DWRITE_FONT_WEIGHT_LIGHT, Rgb(1, 1, 1, 0.92f), false,
+    Text(Clock(), 0, 90, canvasW_, 190, 144, DWRITE_FONT_WEIGHT_LIGHT, Rgb(1, 1, 1, 0.92f), false,
          DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    Text(L"Nothing playing", 0, 290, canvasW_, 36, 22, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.45f), false,
+    Text(L"Nothing playing", 0, 300, canvasW_, 40, 26, DWRITE_FONT_WEIGHT_NORMAL, Rgb(1, 1, 1, 0.45f), false,
          DWRITE_TEXT_ALIGNMENT_CENTER);
     (void)t;
 }

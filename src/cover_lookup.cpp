@@ -24,6 +24,7 @@ std::condition_variable g_cv;
 std::map<std::string, Entry> g_cache;
 std::vector<std::string> g_order;  // insertion order, for trimming the cache
 std::string g_pending;             // newest title waiting for the worker
+std::string g_pendingCountry;      // the station's country code for that title
 std::thread g_thread;
 std::atomic<bool> g_stop{false};
 
@@ -54,11 +55,12 @@ bool Download(const std::string& url, std::shared_ptr<const std::vector<uint8_t>
 }
 
 // iTunes Search API: {"results":[{"wrapperType":"track","artistName":"..","trackName":"..","artworkUrl100":".."}, ...]}
-bool SearchITunes(const Wanted& w, const std::wstring& artistTerm, std::shared_ptr<const std::vector<uint8_t>>& image,
-                  std::string& found) {
+bool SearchITunes(const Wanted& w, const std::wstring& artistTerm, const std::string& country,
+                  std::shared_ptr<const std::vector<uint8_t>>& image, std::string& found) {
     std::string term = UrlEncode(ToUtf8(artistTerm + L" " + w.track));
     std::wstring url = L"https://itunes.apple.com/search?media=music&entity=song&limit=10&term=" +
                        std::wstring(term.begin(), term.end());
+    if (!country.empty()) url += L"&country=" + std::wstring(country.begin(), country.end());  // e.g. TR
     std::vector<uint8_t> body;
     if (!HttpGet(url, body, 6000, 1024 * 1024)) return false;
     std::string json(body.begin(), body.end());
@@ -112,7 +114,20 @@ bool SearchDeezer(const Wanted& w, bool exactFields, std::shared_ptr<const std::
     return false;
 }
 
-bool Lookup(const std::string& streamTitle, std::shared_ptr<const std::vector<uint8_t>>& image) {
+// The iTunes store to ask first: the setting, or (auto) the station's country. Empty = only the default store.
+std::string StoreCountry(const std::string& stationCountry) {
+    std::string c = GetSettings().coverCountry;
+    if (c == "auto") c = stationCountry;
+    std::string out;
+    for (char ch : c) {
+        if (isalpha(static_cast<unsigned char>(ch))) out.push_back(static_cast<char>(toupper(static_cast<unsigned char>(ch))));
+    }
+    if (out == "UK") out = "GB";
+    return out.size() == 2 ? out : std::string();
+}
+
+bool Lookup(const std::string& streamTitle, const std::string& stationCountry,
+            std::shared_ptr<const std::vector<uint8_t>>& image) {
     std::wstring artist, track;
     if (!SplitArtistTitle(streamTitle, artist, track)) return false;  // no "Artist - Song": nothing to search for
 
@@ -126,10 +141,14 @@ bool Lookup(const std::string& streamTitle, std::shared_ptr<const std::vector<ui
     if (w.firstKey.empty() || w.trackKey.empty()) return false;
 
     // Several tries, strict to loose, over two catalogues. The first hit with a matching artist and track wins.
+    // The station's own iTunes store first (Turkish songs are often missing from the US store), then the default store.
+    const std::string cc = StoreCountry(stationCountry);
     std::string found;
-    bool ok = SearchITunes(w, w.firstArtist, image, found) || SearchDeezer(w, true, image, found) ||
+    bool ok = (!cc.empty() && SearchITunes(w, w.firstArtist, cc, image, found)) ||
+              SearchITunes(w, w.firstArtist, std::string(), image, found) || SearchDeezer(w, true, image, found) ||
               SearchDeezer(w, false, image, found) ||
-              (w.firstArtist != w.artist && SearchITunes(w, w.artist, image, found));
+              (w.firstArtist != w.artist && ((!cc.empty() && SearchITunes(w, w.artist, cc, image, found)) ||
+                                             SearchITunes(w, w.artist, std::string(), image, found)));
     if (ok) Logf("COVER found for '%s' -> %s (%zu bytes)", streamTitle.c_str(), found.c_str(), image->size());
     else Logf("COVER no match for '%s'", streamTitle.c_str());
     return ok;
@@ -137,18 +156,20 @@ bool Lookup(const std::string& streamTitle, std::shared_ptr<const std::vector<ui
 
 void Run() {
     while (!g_stop) {
-        std::string title;
+        std::string title, country;
         {
             std::unique_lock<std::mutex> lock(g_mutex);
             g_cv.wait(lock, [] { return g_stop || !g_pending.empty(); });
             if (g_stop) return;
             title = std::move(g_pending);
+            country = std::move(g_pendingCountry);
             g_pending.clear();
+            g_pendingCountry.clear();
         }
         std::shared_ptr<const std::vector<uint8_t>> image;
         bool ok = false;
         try {
-            ok = Lookup(title, image);
+            ok = Lookup(title, country, image);
         } catch (...) {
             Logf("COVER lookup raised an exception");
         }
@@ -172,7 +193,7 @@ void CoverLookupStop() {
     if (g_thread.joinable()) g_thread.join();
 }
 
-void CoverLookupRequest(const std::string& streamTitle) {
+void CoverLookupRequest(const std::string& streamTitle, const std::string& stationCountry) {
     if (!GetSettings().coverLookup || streamTitle.empty()) return;
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_cache.count(streamTitle)) return;
@@ -183,6 +204,7 @@ void CoverLookupRequest(const std::string& streamTitle) {
         g_order.erase(g_order.begin());
     }
     g_pending = streamTitle;
+    g_pendingCountry = stationCountry;
     g_cv.notify_one();
 }
 

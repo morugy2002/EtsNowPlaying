@@ -50,6 +50,9 @@ void LoadSettings(const std::wstring& dir) {
                 "; 1 = use the optional file EtsNowPlaying.sources.ini (extra song sources for stations that only send a show name).\r\n"
                 "; 0 = never use it.\r\n"
                 "extra_sources=1\r\n"
+                "; Which iTunes store to search for covers first: auto = the station's country from live_streams.sii (e.g. TR),\r\n"
+                "; none = only the default store, or a two-letter country code. Other catalogues are always tried afterwards.\r\n"
+                "cover_country=auto\r\n"
                 "\r\n"
                 "[touch]\r\n"
                 "; 1 = the buttons on the screen can be clicked with the mouse.\r\n"
@@ -64,6 +67,7 @@ void LoadSettings(const std::wstring& dir) {
     EnsureKey(ini, L"media", L"app_filter", L"spotify");
     EnsureKey(ini, L"radio", L"cover_lookup", L"1");
     EnsureKey(ini, L"radio", L"extra_sources", L"1");
+    EnsureKey(ini, L"radio", L"cover_country", L"auto");
     EnsureKey(ini, L"touch", L"enabled", L"1");
     WritePrivateProfileStringW(L"beta", L"touch", nullptr, ini.c_str());
     WritePrivateProfileStringW(L"radio", L"stale_ms", nullptr, ini.c_str());
@@ -77,6 +81,15 @@ void LoadSettings(const std::wstring& dir) {
     g_settings.radioStaleMs = static_cast<int>(GetPrivateProfileIntW(L"radio", L"pause_after_ms", 2500, ini.c_str()));
     g_settings.radioHoldMs = static_cast<int>(GetPrivateProfileIntW(L"radio", L"switch_hold_ms", 600, ini.c_str()));
     g_settings.extraSources = GetPrivateProfileIntW(L"radio", L"extra_sources", 1, ini.c_str()) != 0;
+    {
+        wchar_t cc[32] = {};
+        GetPrivateProfileStringW(L"radio", L"cover_country", L"auto", cc, 32, ini.c_str());
+        std::string v;
+        for (const wchar_t* p = cc; *p; ++p) {
+            if (*p < 128 && !isspace(static_cast<unsigned char>(*p))) v.push_back(static_cast<char>(tolower(*p)));
+        }
+        g_settings.coverCountry = v.empty() ? "none" : v;
+    }
     g_settings.touch = GetPrivateProfileIntW(L"touch", L"enabled", 1, ini.c_str()) != 0;
     g_settings.textureFinder = GetPrivateProfileIntW(L"debug", L"texture_finder", 0, ini.c_str()) != 0;
     g_settings.autoFit = static_cast<int>(GetPrivateProfileIntW(L"screen", L"auto_fit", 1, ini.c_str()));

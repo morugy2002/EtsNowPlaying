@@ -13,7 +13,7 @@ std::string ToUtf8(const std::wstring& s);
 bool SplitArtistTitle(const std::string& raw, std::wstring& artist, std::wstring& title);
 
 // Helpers for matching names between a radio stream and an online catalogue.
-std::wstring NormalizeKey(const std::wstring& s);     // lower case, letters and digits only
+std::wstring NormalizeKey(const std::wstring& s);     // lower case, letters and digits only, accents/Turkish letters folded (Ç->c, ı->i)
 std::wstring StripBrackets(const std::wstring& s);    // "Song (feat. X) [Live]" -> "Song "
 std::wstring FirstArtist(const std::wstring& s);      // "A & B feat. C" -> "A"
 std::wstring BaseTitle(const std::wstring& s);        // "Song (Radio Edit) - Remastered" -> "Song"

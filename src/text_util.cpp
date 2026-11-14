@@ -51,9 +51,45 @@ bool SplitArtistTitle(const std::string& raw, std::wstring& artist, std::wstring
     return true;
 }
 
+// Stations often send "IBRAHIM TATLISES - YAR DILINE" while the catalogues have "İbrahim Tatlıses - Yar Diline": fold
+// accents and the Turkish letters (ı İ ş ğ ç ö ü) to plain ASCII letters so both spellings give the same key.
+static std::wstring FoldDiacritics(const std::wstring& s) {
+    std::wstring in;
+    in.reserve(s.size());
+    for (wchar_t c : s) {
+        switch (c) {
+            case 0x0131: case 0x0130: in.push_back(L'i'); break;  // ı İ
+            case 0x015F: case 0x015E: in.push_back(L's'); break;  // ş Ş
+            case 0x011F: case 0x011E: in.push_back(L'g'); break;  // ğ Ğ
+            case 0x00E7: case 0x00C7: in.push_back(L'c'); break;  // ç Ç
+            case 0x00F6: case 0x00D6: in.push_back(L'o'); break;  // ö Ö
+            case 0x00FC: case 0x00DC: in.push_back(L'u'); break;  // ü Ü
+            case 0x00F8: case 0x00D8: in.push_back(L'o'); break;  // ø Ø
+            case 0x0142: case 0x0141: in.push_back(L'l'); break;  // ł Ł
+            case 0x0111: case 0x0110: in.push_back(L'd'); break;  // đ Đ
+            case 0x00DF: in += L"ss"; break;                      // ß
+            case 0x00E6: case 0x00C6: in += L"ae"; break;         // æ Æ
+            default: in.push_back(c); break;
+        }
+    }
+    // Every other accented letter (é, ñ, ž, ...): split it into letter + accent, then drop the accent.
+    std::wstring out = in;
+    const int n = FoldStringW(MAP_COMPOSITE, in.c_str(), static_cast<int>(in.size()), nullptr, 0);
+    if (n > 0) {
+        std::wstring tmp(static_cast<size_t>(n), L'\0');
+        const int got = FoldStringW(MAP_COMPOSITE, in.c_str(), static_cast<int>(in.size()), tmp.data(), n);
+        if (got > 0) {
+            tmp.resize(static_cast<size_t>(got));
+            out = std::move(tmp);
+        }
+    }
+    out.erase(std::remove_if(out.begin(), out.end(), [](wchar_t c) { return c >= 0x0300 && c <= 0x036F; }), out.end());
+    return out;
+}
+
 std::wstring NormalizeKey(const std::wstring& s) {
     std::wstring out;
-    for (wchar_t c : s) {
+    for (wchar_t c : FoldDiacritics(s)) {
         if (iswalnum(c)) out.push_back(static_cast<wchar_t>(towlower(c)));
     }
     return out;

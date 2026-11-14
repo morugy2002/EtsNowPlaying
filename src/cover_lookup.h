@@ -17,7 +17,8 @@ struct CoverResult {
 // Runs on its own thread; asking again for the same title is cheap.
 void CoverLookupStart();
 void CoverLookupStop();
-void CoverLookupRequest(const std::string& streamTitle);
+// `stationCountry` is the station's country code from live_streams.sii (e.g. "TR"); it picks the iTunes store to ask first.
+void CoverLookupRequest(const std::string& streamTitle, const std::string& stationCountry = std::string());
 CoverResult CoverLookupGet(const std::string& streamTitle);
 
 }  // namespace ep
