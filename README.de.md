@@ -45,6 +45,8 @@ unverändert vom Original, und die Änderungen stehen unter derselben MIT-Lizenz
   blendet ein dunkler Schleier ein. Cover und unscharfer Hintergrund links bleiben hell und farbig.
 - **Untere Zeile:** ein pulsierender roter Punkt, `LIVE` und ein kleiner Equalizer. Sie ersetzt die rote `LIVE`-Anzeige samt `RADIO`-Beschriftung
   oben und die Zeile mit Genre / Land / Bitrate.
+- **Bessere Cover-Treffer:** Beim Vergleichen von Namen werden Akzente und türkische Buchstaben ignoriert (`COK` = `Çok`, `TATLISES` = `Tatlıses`), und iTunes wird zuerst
+  im Store des Senders gefragt (`[radio] cover_country`). Sender mit Titeln in Großbuchstaben ohne Sonderzeichen finden jetzt ihre Cover.
 - Das Spotify-Display ist unverändert.
 
 **DLL dieses Forks holen:** Jeder Push wird von GitHub Actions gebaut ([`build.yml`](.github/workflows/build.yml)). Öffne den
@@ -80,6 +82,7 @@ Entferne vorher andere Plugins, die das GPS-Display verändern, sie würden sich
 | `[screen] auto_fit` | `1` | Bild an das Display jedes Fahrzeugs anpassen. `0` = aus. |
 | `[media] app_filter` | `spotify` | Nur diese App zeigen. Leer = jeder Mediaplayer. |
 | `[radio] cover_lookup` | `1` | Song-Cover und Sender-Logos online suchen. `0` = aus. |
+| `[radio] cover_country` | `auto` | iTunes-Store, der für Cover zuerst gefragt wird: `auto` = Land des Senders aus `live_streams.sii` (z. B. `TR`), `none` = nur Standard-Store, oder ein Ländercode. Andere Kataloge werden danach immer versucht. |
 | `[radio] extra_sources` | `1` | Die optionale Datei `EtsNowPlaying.sources.ini` benutzen (siehe unten). `0` = nie. |
 | `[touch] enabled` | `1` | Maus-Tasten auf dem Display. `0` = aus. |
 
@@ -106,8 +109,8 @@ INI alles.
 
 ## Datenschutz
 
-Kein Tracking, keine Konten. Mit `cover_lookup=1` sendet das Plugin den aktuellen Radio-*Titel* und den *Sendernamen* an
-iTunes, Deezer und radio-browser.info, um ein Cover oder Logo zu finden. Sonst verlässt nichts deinen PC. Mit `0` schaltest du das ab.
+Kein Tracking, keine Konten. Mit `cover_lookup=1` sendet das Plugin den aktuellen Radio-*Titel* und den *Sendernamen*
+(und, um den richtigen iTunes-Store zu fragen, den Ländercode des Senders aus deiner Senderliste) an iTunes, Deezer und radio-browser.info, um ein Cover oder Logo zu finden. Sonst verlässt nichts deinen PC. Mit `0` schaltest du das ab.
 Die optionale Quellen-Datei (siehe oben) bewirkt, dass das Plugin zusätzlich die dort eingetragene Web-Adresse fragt, solange dieser
 Sender läuft; diese Adresse sieht deine IP-Adresse wie jede Webseite. `extra_sources=0` schaltet das ab.
 
@@ -133,8 +136,8 @@ eigenes Risiko, und beachte die Regeln der Server, auf denen du spielst.
 ## Datenschutz & Nutzungsbedingungen
 
 **Datenschutz.** EtsNowPlaying hat keine Konten, keine Analyse und keine eigene Telemetrie. Es liest den Radio-Stream des Spiels und
-die Windows-Mediensteuerung auf deinem PC aus. Mit `[radio] cover_lookup=1` (Standard) sendet es den **aktuellen Radio-Songtitel
-und den Sendernamen** an **iTunes Search (Apple), Deezer und radio-browser.info**, um ein Cover oder Logo zu finden; wie bei jeder
+die Windows-Mediensteuerung auf deinem PC aus. Mit `[radio] cover_lookup=1` (Standard) sendet es den **aktuellen Radio-Songtitel,
+den Sendernamen und den Ländercode des Senders (aus deiner Senderliste)** an **iTunes Search (Apple), Deezer und radio-browser.info**, um ein Cover oder Logo zu finden; wie bei jeder
 Web-Anfrage sehen diese Dienste deine IP-Adresse. Sonst wird nichts gesendet: keine persönlichen Daten, keine Spieldaten, keine
 Spotify-Daten. Mit `cover_lookup=0` sind alle Online-Anfragen aus. Logos werden in
 `Dokumente\Euro Truck Simulator 2\EtsNowPlaying\logos` zwischengespeichert, und `diag.log` bleibt auf deinem PC, solange du sie nicht selbst

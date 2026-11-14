@@ -44,6 +44,8 @@ original, and the changes are released under the same MIT License.
   column. The cover and the blurred background on the left stay bright and colourful.
 - **Bottom row:** a pulsing red dot, `LIVE` and a small equalizer. It replaces the red `LIVE` pill with the `RADIO`
   label at the top and the genre / country / bitrate line.
+- **Better cover matches:** accents and Turkish letters are ignored when comparing names (`COK` = `Çok`, `TATLISES` = `Tatlıses`), and iTunes is asked in the
+  station's own store first (`[radio] cover_country`). Stations that send upper-case ASCII titles now find their covers.
 - The Spotify screen is unchanged.
 
 **Get the DLL of this fork:** every push is built by GitHub Actions ([`build.yml`](.github/workflows/build.yml)). Open the latest
@@ -79,6 +81,7 @@ Remove other plugins that change the GPS screen first, they would get in each ot
 | `[screen] auto_fit` | `1` | Fit the picture to each vehicle's display. `0` = off. |
 | `[media] app_filter` | `spotify` | Only show this app. Empty = any media player. |
 | `[radio] cover_lookup` | `1` | Look up song covers and station logos online. `0` = off. |
+| `[radio] cover_country` | `auto` | iTunes store to ask for covers first: `auto` = the station's country from `live_streams.sii` (e.g. `TR`), `none` = default store only, or a country code. Other catalogues are always tried afterwards. |
 | `[radio] extra_sources` | `1` | Use the optional file `EtsNowPlaying.sources.ini` (see below). `0` = never. |
 | `[touch] enabled` | `1` | Mouse buttons on the screen. `0` = off. |
 
@@ -106,7 +109,7 @@ INI to switch it all off.
 ## Privacy
 
 No tracking, no accounts. With `cover_lookup=1` the plugin sends the current radio *title* and the *station name*
-to iTunes, Deezer and radio-browser.info to find a cover or logo. Nothing else leaves your PC. Set it to `0` to switch this off.
+(and, to ask the right iTunes store, the station's country code from your radio list) to iTunes, Deezer and radio-browser.info to find a cover or logo. Nothing else leaves your PC. Set it to `0` to switch this off.
 The optional sources file (see above) makes the plugin also ask the listed web address while that station plays; that
 address sees your IP address like any website. `extra_sources=0` switches this off.
 
@@ -133,7 +136,7 @@ own risk and follow the rules of the servers you play on.
 
 **Privacy.** EtsNowPlaying has no accounts, no analytics and no telemetry of its own. It reads what is playing from the game's
 radio stream and the Windows media controls on your PC. With `[radio] cover_lookup=1` (the default) it sends the **current radio
-song title and the station name** to **iTunes Search (Apple), Deezer and radio-browser.info** to find a cover or logo; like any web
+song title, the station name and the station's country code (from your radio list)** to **iTunes Search (Apple), Deezer and radio-browser.info** to find a cover or logo; like any web
 request, these services see your IP address. Nothing else is sent: no personal data, no game data, no Spotify data. Set
 `cover_lookup=0` to switch off all online requests. Logos are cached in `Documents\Euro Truck Simulator 2\EtsNowPlaying\logos`,
 and `diag.log` stays on your PC unless you send it yourself. If an entry of the optional file `EtsNowPlaying.sources.ini` is
